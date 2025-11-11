@@ -3,7 +3,7 @@
 # Install with: pip install -r requirements.txt
 
 # Core Frameworks
-pyautogen>=0.2.0              # Microsoft AutoGen framework
+pyautogen>=0.10.0            # Microsoft AutoGen (includes autogen-agentchat and autogen-core)
 crewai>=0.1.0                # CrewAI framework
 crewai-tools>=0.0.1          # CrewAI tools extension
 

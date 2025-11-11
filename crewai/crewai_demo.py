@@ -27,7 +27,7 @@ import json
 from pathlib import Path
 from datetime import datetime
 from crewai import Agent, Task, Crew
-from crewai_tools import tool
+from crewai.tools import tool
 import requests
 
 # Add parent directory to path to import shared_config
@@ -61,7 +61,7 @@ def search_flight_prices(destination: str, departure_city: str = "New York") -> 
     4. Best booking times and price trends
     5. Seasonal pricing variations
 
-    Focus on realistic, current pricing for January 2025 travel.
+    Focus on realistic, current pricing for January 2026 travel.
     """
 
 
@@ -71,7 +71,7 @@ def search_hotel_options(location: str, check_in_date: str) -> str:
     Search for real hotel options using web search.
     Provides current hotel availability and pricing information.
     """
-    search_query = f"hotels in {location} {check_in_date} reviews ratings prices 2025"
+    search_query = f"hotels in {location} {check_in_date} reviews ratings prices 2026"
 
     return f"""
     Research task: Find hotels in {location} for check-in {check_in_date}.
@@ -94,7 +94,7 @@ def search_attractions_activities(destination: str) -> str:
     Search for real attractions and activities in a destination.
     Provides comprehensive information about popular sites and experiences.
     """
-    search_query = f"{destination} attractions activities tours things to do 2025"
+    search_query = f"{destination} attractions activities tours things to do 2026"
 
     return f"""
     Research task: Find attractions and activities in {destination}.
@@ -142,13 +142,13 @@ def search_travel_costs(destination: str) -> str:
 # AGENT DEFINITIONS
 # ============================================================================
 
-def create_flight_agent():
+def create_flight_agent(destination: str, trip_dates: str):
     """Create the Flight Specialist agent with real research tools."""
     return Agent(
         role="Flight Specialist",
-        goal="Research and recommend the best flight options for the Iceland trip, "
-             "considering dates, airlines, prices, and flight durations. Use real data "
-             "from flight booking sites to provide accurate, current pricing.",
+        goal=f"Research and recommend the best flight options for the {destination} trip "
+             f"({trip_dates}), considering dates, airlines, prices, and flight durations. "
+             f"Use real data from flight booking sites to provide accurate, current pricing.",
         backstory="You are an experienced flight specialist with deep knowledge of "
                   "airline schedules, pricing patterns, and travel routes. You excel at "
                   "finding the best flight options that balance cost and convenience. "
@@ -160,13 +160,22 @@ def create_flight_agent():
     )
 
 
-def create_hotel_agent():
+def create_hotel_agent(destination: str, trip_dates: str):
     """Create the Accommodation Specialist agent with real research tools."""
+    # Determine main city for hotels (if destination is just a country, use capital)
+    hotel_location = destination
+    if destination.lower() == "iceland":
+        hotel_location = "Reykjavik"
+    elif destination.lower() == "france":
+        hotel_location = "Paris"
+    elif destination.lower() == "japan":
+        hotel_location = "Tokyo"
+
     return Agent(
         role="Accommodation Specialist",
-        goal="Suggest top-rated hotels in Reykjavik for the trip duration, "
-             "considering amenities, location, and value for money. Use real hotel data "
-             "from booking sites with current prices and reviews.",
+        goal=f"Suggest top-rated hotels in {hotel_location} for the {destination} trip "
+             f"({trip_dates}), considering amenities, location, and value for money. "
+             f"Use real hotel data from booking sites with current prices and reviews.",
         backstory="You are a seasoned accommodation expert with extensive knowledge of "
                   "hotels worldwide. You understand traveler needs and can match them with "
                   "perfect accommodations. You read reviews meticulously and know which "
@@ -178,30 +187,30 @@ def create_hotel_agent():
     )
 
 
-def create_itinerary_agent():
+def create_itinerary_agent(destination: str, trip_duration: str):
     """Create the Travel Planner agent with real research tools."""
     return Agent(
         role="Travel Planner",
-        goal="Create a detailed day-by-day travel plan with activities and attractions "
-             "that maximize the Iceland experience in 5 days. Use real current information "
-             "about attractions, opening hours, and accessibility.",
-        backstory="You are a creative travel planner with a passion for Iceland. "
-                  "You have lived there and know every hidden gem. You create itineraries "
-                  "that are well-paced, exciting, and memorable. You consider travel times, "
-                  "weather, and traveler preferences to craft the perfect journey. You "
-                  "always verify current information about attractions and tours.",
+        goal=f"Create a detailed day-by-day travel plan with activities and attractions "
+             f"that maximize the {destination} experience in {trip_duration}. "
+             f"Use real current information about attractions, opening hours, and accessibility.",
+        backstory=f"You are a creative travel planner with a passion for {destination}. "
+                  f"You have extensive knowledge of {destination}'s attractions, culture, and hidden gems. "
+                  f"You create itineraries that are well-paced, exciting, and memorable. "
+                  f"You consider travel times, weather, and traveler preferences to craft the perfect journey. "
+                  f"You always verify current information about attractions and tours.",
         tools=[search_attractions_activities],
         verbose=True,
         allow_delegation=False
     )
 
 
-def create_budget_agent():
+def create_budget_agent(destination: str):
     """Create the Financial Advisor agent with real cost research tools."""
     return Agent(
         role="Financial Advisor",
-        goal="Calculate total trip costs and identify cost-saving opportunities "
-             "while maintaining quality. Use real current pricing data for all expenses.",
+        goal=f"Calculate total trip costs for {destination} and identify cost-saving opportunities "
+             f"while maintaining quality. Use real current pricing data for all expenses.",
         backstory="You are a meticulous financial advisor specializing in travel budgeting. "
                   "You can analyze costs across flights, accommodations, activities, and meals. "
                   "You identify hidden costs and suggest smart ways to save money without "
@@ -217,73 +226,81 @@ def create_budget_agent():
 # TASK DEFINITIONS
 # ============================================================================
 
-def create_flight_task(flight_agent):
+def create_flight_task(flight_agent, destination: str, trip_dates: str, departure_city: str):
     """Define the flight research task using real data."""
     return Task(
-        description="Research and compile a list of REAL flight options to Iceland for a 5-day trip. "
-                   "The trip starts on January 15, 2025 and ends on January 20, 2025. "
-                   "Use actual current flight data from booking sites like Skyscanner, Kayak, "
-                   "Google Flights, or Expedia. Find at least 2-3 different flight options from "
-                   "major airlines, including details about departure times, arrival times, "
-                   "duration, and current realistic prices for January 2025. Provide "
-                   "recommendations on which flight offers the best value considering both "
-                   "price and convenience.",
+        description=f"Research and compile a list of REAL flight options from {departure_city} to {destination} "
+                   f"for the trip ({trip_dates}). "
+                   f"Use actual current flight data from booking sites like Skyscanner, Kayak, "
+                   f"Google Flights, or Expedia. Find at least 2-3 different flight options from "
+                   f"major airlines, including details about departure times, arrival times, "
+                   f"duration, and current realistic prices. Provide "
+                   f"recommendations on which flight offers the best value considering both "
+                   f"price and convenience.",
         agent=flight_agent,
-        expected_output="A detailed report with 2-3 REAL flight options including airlines, "
-                       "times, duration, current prices, and a recommendation with reasoning based on "
-                       "actual data from flight booking sites"
+        expected_output=f"A detailed report with 2-3 REAL flight options from {departure_city} to {destination} "
+                       f"including airlines, times, duration, current prices, and a recommendation with reasoning based on "
+                       f"actual data from flight booking sites"
     )
 
 
-def create_hotel_task(hotel_agent):
+def create_hotel_task(hotel_agent, destination: str, trip_dates: str):
     """Define the hotel recommendation task using real data."""
+    # Determine main city for hotels
+    hotel_location = destination
+    if destination.lower() == "iceland":
+        hotel_location = "Reykjavik"
+    elif destination.lower() == "france":
+        hotel_location = "Paris"
+    elif destination.lower() == "japan":
+        hotel_location = "Tokyo"
+
     return Task(
-        description="Based on the trip dates (January 15-20, 2025), find and recommend "
-                   "the top 3-4 REAL hotels in Reykjavik city center. Research actual hotels "
-                   "on Booking.com, TripAdvisor, Google Hotels, and Expedia. For each hotel, "
-                   "provide the actual name, current guest ratings, real prices per night "
-                   "for January 2025, confirmed amenities, and explain why it suits this trip. "
-                   "Include a mix of budget, mid-range, and luxury options with honest reviews.",
+        description=f"Based on the trip dates ({trip_dates}), find and recommend "
+                   f"the top 3-4 REAL hotels in {hotel_location}. Research actual hotels "
+                   f"on Booking.com, TripAdvisor, Google Hotels, and Expedia. For each hotel, "
+                   f"provide the actual name, current guest ratings, real prices per night, "
+                   f"confirmed amenities, and explain why it suits this trip. "
+                   f"Include a mix of budget, mid-range, and luxury options with honest reviews.",
         agent=hotel_agent,
-        expected_output="A curated list of 3-4 REAL hotel recommendations with actual details "
-                       "about each hotel, confirmed amenities, real guest ratings, current January 2025 prices, "
-                       "and personalized recommendations based on actual guest reviews"
+        expected_output=f"A curated list of 3-4 REAL hotel recommendations in {hotel_location} with actual details "
+                       f"about each hotel, confirmed amenities, real guest ratings, current prices, "
+                       f"and personalized recommendations based on actual guest reviews"
     )
 
 
-def create_itinerary_task(itinerary_agent):
+def create_itinerary_task(itinerary_agent, destination: str, trip_duration: str, trip_dates: str):
     """Define the itinerary planning task using real information."""
     return Task(
-        description="Create a detailed 5-day itinerary for Iceland (January 15-20, 2025) based on "
-                   "REAL current information. Research actual attractions, their opening hours, "
-                   "accessibility, and entry fees. Plan day-by-day activities including visits "
-                   "to real attractions like the Golden Circle, Blue Lagoon, South Coast waterfalls, "
-                   "and other verified sites. Include realistic estimated travel times between "
-                   "locations, activity durations, and recommended visit times. Consider actual "
-                   "weather patterns for January in Iceland and make the itinerary realistic and well-paced.",
+        description=f"Create a detailed {trip_duration} itinerary for {destination} ({trip_dates}) based on "
+                   f"REAL current information. Research actual attractions, their opening hours, "
+                   f"accessibility, and entry fees. Plan day-by-day activities including visits "
+                   f"to real attractions and verified sites. Include realistic estimated travel times between "
+                   f"locations, activity durations, and recommended visit times. Consider actual "
+                   f"weather patterns for this time period in {destination} and make the itinerary realistic and well-paced.",
         agent=itinerary_agent,
-        expected_output="A detailed day-by-day itinerary with REAL activities based on verified "
-                       "attractions, realistic travel times, accurate estimated durations, current "
-                       "entry fees, and practical tips for January weather conditions"
+        expected_output=f"A detailed day-by-day itinerary for {destination} with REAL activities based on verified "
+                       f"attractions, realistic travel times, accurate estimated durations, current "
+                       f"entry fees, and practical tips for {trip_duration} trip to {destination}"
     )
 
 
-def create_budget_task(budget_agent):
+def create_budget_task(budget_agent, destination: str, trip_duration: str):
     """Define the budget calculation task using real cost data."""
     return Task(
-        description="Based on the REAL flight options, hotel recommendations, and itinerary "
-                   "created by the other agents, calculate a comprehensive budget for the "
-                   "5-day Iceland trip using current 2025 pricing. Research and include actual "
-                   "costs for flights, accommodation, meals (use real restaurant prices in Reykjavik), "
-                   "activities/tours (verified prices), transportation within Iceland (rental car "
-                   "or public transport), and miscellaneous expenses. Provide total cost estimates "
-                   "for budget, mid-range, and luxury options based on real prices. Suggest "
-                   "genuine cost-saving tips based on current market conditions.",
+        description=f"Based on the REAL flight options, hotel recommendations, and itinerary "
+                   f"created by the other agents, calculate a comprehensive budget for the "
+                   f"{trip_duration} {destination} trip using current pricing. Research and include actual "
+                   f"costs for flights, accommodation, meals (use real restaurant prices in the destination), "
+                   f"activities/tours (verified prices), transportation within {destination}, "
+                   f"and miscellaneous expenses. Provide total cost estimates "
+                   f"for budget, mid-range, and luxury options based on real prices. Suggest "
+                   f"genuine cost-saving tips based on current market conditions.",
         agent=budget_agent,
-        expected_output="A comprehensive budget report with itemized REAL costs for flights, "
-                       "accommodation, meals (with realistic Reykjavik pricing), activities with actual "
-                       "entry fees, transportation, and total realistic estimates at different budget "
-                       "levels, plus evidence-based cost-saving recommendations"
+        expected_output=f"A comprehensive budget report with itemized REAL costs for flights, "
+                       f"accommodation, meals, activities with actual entry fees, transportation, "
+                       f"and total realistic estimates at different budget levels, plus "
+                       f"evidence-based cost-saving recommendations for a {trip_duration} trip to {destination}"
     )
 
 
@@ -291,13 +308,31 @@ def create_budget_task(budget_agent):
 # CREW ORCHESTRATION
 # ============================================================================
 
-def main():
-    """Main function to orchestrate the travel planning crew."""
+def main(destination: str = "Iceland", trip_duration: str = "5 days",
+         trip_dates: str = "January 15-20, 2026", departure_city: str = "New York",
+         travelers: int = 2, budget_preference: str = "mid-range"):
+    """
+    Main function to orchestrate the travel planning crew.
+
+    Args:
+        destination: Travel destination (e.g., "Iceland", "France", "Japan")
+        trip_duration: Duration of trip (e.g., "5 days", "7 days")
+        trip_dates: Specific dates (e.g., "January 15-20, 2026")
+        departure_city: City you're departing from (e.g., "New York", "Los Angeles")
+        travelers: Number of travelers
+        budget_preference: Budget level ("budget", "mid-range", "luxury")
+    """
 
     print("=" * 80)
     print("CrewAI Multi-Agent Travel Planning System (REAL API VERSION)")
-    print("Planning a 5-Day Trip to Iceland")
+    print(f"Planning a {trip_duration} Trip to {destination}")
     print("=" * 80)
+    print()
+    print(f"📍 Destination: {destination}")
+    print(f"📅 Dates: {trip_dates}")
+    print(f"✈️  Departure from: {departure_city}")
+    print(f"👥 Travelers: {travelers}")
+    print(f"💰 Budget: {budget_preference}")
     print()
 
     # Validate configuration before proceeding
@@ -316,28 +351,28 @@ def main():
     print("Tip: Check your API usage at https://platform.openai.com/account/usage")
     print()
 
-    # Create agents
+    # Create agents with destination parameters
     print("[1/4] Creating Flight Specialist Agent (researches real flights)...")
-    flight_agent = create_flight_agent()
+    flight_agent = create_flight_agent(destination, trip_dates)
 
     print("[2/4] Creating Accommodation Specialist Agent (researches real hotels)...")
-    hotel_agent = create_hotel_agent()
+    hotel_agent = create_hotel_agent(destination, trip_dates)
 
     print("[3/4] Creating Travel Planner Agent (researches real attractions)...")
-    itinerary_agent = create_itinerary_agent()
+    itinerary_agent = create_itinerary_agent(destination, trip_duration)
 
     print("[4/4] Creating Financial Advisor Agent (analyzes real costs)...")
-    budget_agent = create_budget_agent()
+    budget_agent = create_budget_agent(destination)
 
     print("\n✅ All agents created successfully!")
     print()
 
-    # Create tasks
+    # Create tasks with destination parameters
     print("Creating tasks for the crew...")
-    flight_task = create_flight_task(flight_agent)
-    hotel_task = create_hotel_task(hotel_agent)
-    itinerary_task = create_itinerary_task(itinerary_agent)
-    budget_task = create_budget_task(budget_agent)
+    flight_task = create_flight_task(flight_agent, destination, trip_dates, departure_city)
+    hotel_task = create_hotel_task(hotel_agent, destination, trip_dates)
+    itinerary_task = create_itinerary_task(itinerary_agent, destination, trip_duration, trip_dates)
+    budget_task = create_budget_task(budget_agent, destination, trip_duration)
 
     print("Tasks created successfully!")
     print()
@@ -357,18 +392,18 @@ def main():
     # Execute the crew
     print("=" * 80)
     print("Starting Crew Execution with REAL API Calls...")
-    print("This will use OpenAI API to research actual flight, hotel, and cost data")
+    print(f"Planning {trip_duration} trip to {destination} ({trip_dates})")
     print("=" * 80)
     print()
 
     try:
         result = crew.kickoff(inputs={
-            "trip_destination": "Iceland",
-            "trip_duration": "5 days",
-            "trip_dates": "January 15-20, 2025",
-            "departure_city": "New York",
-            "travelers": 2,
-            "budget_preference": "mid-range"
+            "trip_destination": destination,
+            "trip_duration": trip_duration,
+            "trip_dates": trip_dates,
+            "departure_city": departure_city,
+            "travelers": travelers,
+            "budget_preference": budget_preference
         })
 
         print()

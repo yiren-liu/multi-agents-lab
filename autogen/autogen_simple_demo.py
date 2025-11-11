@@ -2,19 +2,19 @@
 Simplified AutoGen Demo - Interview Platform Product Planning
 
 This is a lightweight version for quick testing and understanding the workflow.
-It uses the same four-agent architecture but with simplified prompts.
+It demonstrates multi-agent collaboration by having each agent generate responses.
 """
 
-import os
 from datetime import datetime
 from config import Config, WorkflowConfig
+import json
 
-# Check if autogen is available, provide helpful message if not
+# Try to import OpenAI client
 try:
-    import autogen
+    from openai import OpenAI
 except ImportError:
-    print("ERROR: pyautogen is not installed!")
-    print("Please run: pip install pyautogen")
+    print("ERROR: OpenAI client is not installed!")
+    print("Please run: pip install -r ../requirements.txt")
     exit(1)
 
 
@@ -27,8 +27,9 @@ class SimpleInterviewPlatformWorkflow:
             print("ERROR: Configuration validation failed!")
             exit(1)
 
-        self.config_list = Config.get_config_list()
+        self.client = OpenAI(api_key=Config.OPENAI_API_KEY, base_url=Config.OPENAI_API_BASE)
         self.outputs = {}
+        self.model = Config.OPENAI_MODEL
 
     def run(self):
         """Execute the complete workflow"""
@@ -36,7 +37,7 @@ class SimpleInterviewPlatformWorkflow:
         print("AUTOGEN INTERVIEW PLATFORM WORKFLOW - SIMPLIFIED DEMO")
         print("="*80)
         print(f"Start Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"Model: {Config.OPENAI_MODEL}\n")
+        print(f"Model: {self.model}\n")
 
         # Phase 1: Research
         self.phase_research()
@@ -58,19 +59,25 @@ class SimpleInterviewPlatformWorkflow:
         print("\n" + "="*80)
         print("PHASE 1: MARKET RESEARCH")
         print("="*80)
+        print("[ResearchAgent is analyzing the market...]")
 
-        agent = autogen.ConversableAgent(
-            name="ResearchAgent",
-            system_message="""You are a market research analyst. Provide a brief
-            analysis of 3 competitors in AI interview platforms (HireVue, Pymetrics, Codility).
-            List their key features and identify market gaps in 200 words.""",
-            llm_config={"config_list": self.config_list, "temperature": 0.7},
-            human_input_mode="NEVER",
+        system_prompt = """You are a market research analyst. Provide a brief analysis of
+3 competitors in AI interview platforms (HireVue, Pymetrics, Codility).
+List their key features and identify market gaps in 150 words."""
+
+        user_message = "Analyze the current market for AI-powered interview platforms."
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            temperature=Config.AGENT_TEMPERATURE,
+            max_tokens=Config.AGENT_MAX_TOKENS,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ]
         )
 
-        message = "Analyze the current market for AI-powered interview platforms."
-        self.outputs["research"] = agent.generate_reply(messages=[{"content": message, "role": "user"}])
-
+        self.outputs["research"] = response.choices[0].message.content
         print("\n[ResearchAgent Output]")
         print(self.outputs["research"][:500] + "..." if len(self.outputs["research"]) > 500 else self.outputs["research"])
 
@@ -79,20 +86,28 @@ class SimpleInterviewPlatformWorkflow:
         print("\n" + "="*80)
         print("PHASE 2: OPPORTUNITY ANALYSIS")
         print("="*80)
+        print("[AnalysisAgent is identifying opportunities...]")
 
-        agent = autogen.ConversableAgent(
-            name="AnalysisAgent",
-            system_message="""You are a product analyst. Based on market research,
-            identify 3 key opportunities for an AI interview platform startup.
-            For each, explain the gap and why it matters in 150 words.""",
-            llm_config={"config_list": self.config_list, "temperature": 0.7},
-            human_input_mode="NEVER",
+        system_prompt = """You are a product analyst. Based on the market research provided,
+identify 3 key market opportunities or gaps for a new AI interview platform.
+Be concise in 150 words."""
+
+        user_message = f"""Market research findings:
+{self.outputs['research']}
+
+Now identify market opportunities and gaps."""
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            temperature=Config.AGENT_TEMPERATURE,
+            max_tokens=Config.AGENT_MAX_TOKENS,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ]
         )
 
-        message = f"""Based on this research, identify 3 market opportunities:
-        {self.outputs["research"][:300]}..."""
-        self.outputs["analysis"] = agent.generate_reply(messages=[{"content": message, "role": "user"}])
-
+        self.outputs["analysis"] = response.choices[0].message.content
         print("\n[AnalysisAgent Output]")
         print(self.outputs["analysis"][:500] + "..." if len(self.outputs["analysis"]) > 500 else self.outputs["analysis"])
 
@@ -101,20 +116,30 @@ class SimpleInterviewPlatformWorkflow:
         print("\n" + "="*80)
         print("PHASE 3: PRODUCT BLUEPRINT")
         print("="*80)
+        print("[BlueprintAgent is designing the product...]")
 
-        agent = autogen.ConversableAgent(
-            name="BlueprintAgent",
-            system_message="""You are a product designer. Create a brief product blueprint
-            with 5 core features for an AI interview platform and a simple user journey
-            in 200 words.""",
-            llm_config={"config_list": self.config_list, "temperature": 0.7},
-            human_input_mode="NEVER",
+        system_prompt = """You are a product designer. Based on the market analysis and opportunities,
+create a brief product blueprint including:
+- Key features (3-5)
+- User journey (2-3 steps)
+Keep it concise - 150 words."""
+
+        user_message = f"""Market Analysis:
+{self.outputs['analysis']}
+
+Create a product blueprint for our platform."""
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            temperature=Config.AGENT_TEMPERATURE,
+            max_tokens=Config.AGENT_MAX_TOKENS,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ]
         )
 
-        message = f"""Based on these opportunities, design the product:
-        {self.outputs["analysis"][:300]}..."""
-        self.outputs["blueprint"] = agent.generate_reply(messages=[{"content": message, "role": "user"}])
-
+        self.outputs["blueprint"] = response.choices[0].message.content
         print("\n[BlueprintAgent Output]")
         print(self.outputs["blueprint"][:500] + "..." if len(self.outputs["blueprint"]) > 500 else self.outputs["blueprint"])
 
@@ -123,49 +148,63 @@ class SimpleInterviewPlatformWorkflow:
         print("\n" + "="*80)
         print("PHASE 4: STRATEGIC REVIEW")
         print("="*80)
+        print("[ReviewerAgent is providing recommendations...]")
 
-        agent = autogen.ConversableAgent(
-            name="ReviewerAgent",
-            system_message="""You are a product executive. Review the product blueprint
-            and provide 3-4 strategic recommendations for success and implementation priorities
-            in 200 words.""",
-            llm_config={"config_list": self.config_list, "temperature": 0.7},
-            human_input_mode="NEVER",
+        system_prompt = """You are a product reviewer and strategist. Review the product blueprint
+and provide 3 strategic recommendations for success.
+Be concise - 150 words."""
+
+        user_message = f"""Product Blueprint:
+{self.outputs['blueprint']}
+
+Provide strategic review and recommendations."""
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            temperature=Config.AGENT_TEMPERATURE,
+            max_tokens=Config.AGENT_MAX_TOKENS,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ]
         )
 
-        message = f"""Review this product blueprint and provide recommendations:
-        {self.outputs["blueprint"][:300]}..."""
-        self.outputs["review"] = agent.generate_reply(messages=[{"content": message, "role": "user"}])
-
+        self.outputs["review"] = response.choices[0].message.content
         print("\n[ReviewerAgent Output]")
         print(self.outputs["review"][:500] + "..." if len(self.outputs["review"]) > 500 else self.outputs["review"])
 
     def print_summary(self):
-        """Print workflow summary"""
+        """Print final summary"""
         print("\n" + "="*80)
-        print("WORKFLOW COMPLETED")
+        print("FINAL SUMMARY")
         print("="*80)
+
+        print("""
+This workflow demonstrated a 4-agent collaboration:
+1. ResearchAgent - Analyzed the market
+2. AnalysisAgent - Identified opportunities
+3. BlueprintAgent - Designed the product
+4. ReviewerAgent - Provided strategic recommendations
+
+Each agent received context from the previous agent's output,
+demonstrating the sequential workflow pattern of AutoGen.
+""")
+
         print(f"End Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print("\nPhases Completed:")
-        print("✓ Market Research & Competitive Analysis")
-        print("✓ Opportunity Identification & Analysis")
-        print("✓ Product Blueprint Creation")
-        print("✓ Strategic Review & Recommendations")
-        print("\nFor detailed outputs, run: python autogen_interview_platform.py")
-
-
-def main():
-    """Main execution"""
-    try:
-        workflow = SimpleInterviewPlatformWorkflow()
-        workflow.run()
-    except Exception as e:
-        print(f"\nERROR: {str(e)}")
-        print("\nTroubleshooting:")
-        print("1. Ensure OPENAI_API_KEY is set: export OPENAI_API_KEY='your-key'")
-        print("2. Install dependencies: pip install -r requirements.txt")
-        print("3. Check your API key is valid and has sufficient quota")
+        print("="*80)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        workflow = SimpleInterviewPlatformWorkflow()
+        workflow.run()
+        print("\n✅ Workflow completed successfully!")
+    except Exception as e:
+        print(f"\n❌ Error during workflow execution: {str(e)}")
+        print("\nTroubleshooting:")
+        print("1. Verify OPENAI_API_KEY is set in .env")
+        print("2. Check your API key has sufficient credits")
+        print("3. Verify internet connection")
+        print("4. Check OpenAI API status at https://status.openai.com")
+        import traceback
+        traceback.print_exc()
